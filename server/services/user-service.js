@@ -5,7 +5,6 @@ import UserSchema from '../modules/user-module.js';
 import TokenService from './token-service.js';
 import UserDto from '../dtos/user-dto.js';
 import ApiError from '../exceptions/api-error.js';
-import userModule from '../modules/user-module.js';
 
 class UserService {
   async registration(email, password) {
@@ -21,7 +20,7 @@ class UserService {
     const user = await UserSchema.create({ email, password: hashPassword, activationLink });
     await mailService.sendActivationMail(email, `${process.env.API_URL}/api/activate/${activationLink}`);
 
-    const userDto = new UserDto(user); //id, email, isActivated
+    const userDto = new UserDto(user); //id, email, isActived
     const tokens = TokenService.generateTokens({ ...userDto });
     await TokenService.saveToken(userDto.id, tokens.refreshToken);
 
@@ -47,7 +46,7 @@ class UserService {
       throw ApiError.BadRequest('Пользователь с таким email не найден');
     }
 
-    const isPassEquals = await bcrypt.compare(password, user.password);
+    const isPassEquals = bcrypt.compare(password, user.password);
     if (!isPassEquals) {
       throw ApiError.BadRequest('Неверный пароль');
     }

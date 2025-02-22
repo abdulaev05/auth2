@@ -1,15 +1,18 @@
 "use client";
 
+import AuthService from "@/services/AuthService";
+import { useAppDispatch } from "@/store/hooks";
+import { setAuth, setUser } from "@/store/slices/userSlice";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 
-interface Inputs {
+type Inputs = {
   email: string;
   password: string;
-}
+};
 
 // cхема валидации с помощью Yup
 const schema = yup.object().shape({
@@ -24,6 +27,7 @@ const schema = yup.object().shape({
 });
 
 const Register = () => {
+  const dispatch = useAppDispatch();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorSendForm, setErrorSendForm] = useState(false);
@@ -33,44 +37,33 @@ const Register = () => {
     handleSubmit,
     formState: { errors },
   } = useForm<Inputs>({
-    resolver: yupResolver(schema), // Подключаем валидацию через Yup
+    resolver: yupResolver(schema),
   });
 
-  // Обработчик отправки формы
-  const onSubmit: SubmitHandler<Inputs> = async data => {
+  const onSubmit: SubmitHandler<Inputs> = async (data): Promise<void> => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/registration`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data), // Отправляем данные как JSON
-        }
-      );
+      const { email, password } = data;
+      const response = await AuthService.registration(email, password);
 
-      if (!response.ok) {
+      if (response.status < 200 && response.status >= 300) {
         console.log(response);
-        throw new Error("Ошибка регистрации");
         setErrorSendForm(true);
+        throw new Error("Ошибка регистрации");
       }
 
-      const result = await response.json();
-      console.log("Регистрация успешна:", result);
+      localStorage.setItem("token", response.data.accessToken);
+      dispatch(setAuth(true));
+      dispatch(setUser(response.data.user));
+      console.log("Регистрация успешна:", response);
       setErrorSendForm(false);
-      router.push("/");
-
-      // Тут можно сделать редирект или уведомление о успешной регистрации
+      router.push("/login");
     } catch (error) {
       console.error("Ошибка регистрации:", error);
       setErrorSendForm(true);
     } finally {
       setLoading(false);
     }
-
-    // Здесь вы можете отправить данные на сервер для авторизации
   };
 
   return (
@@ -136,7 +129,9 @@ const Register = () => {
             Регистрация
           </button>
 
-          {errorSendForm && <h4 className='text-red-600'>Неверный email</h4>}
+          {errorSendForm && (
+            <h4 className='text-red-600'>Неверный Email или Пароль</h4>
+          )}
         </form>
       )}
     </div>

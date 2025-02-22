@@ -1,16 +1,19 @@
 "use client";
 
-import { useForm, SubmitHandler } from "react-hook-form";
-import Router from "next/router";
-import * as yup from "yup";
+import AuthService from "@/services/AuthService";
+import { useAppDispatch } from "@/store/hooks";
+import { setAuth, setUser } from "@/store/slices/userSlice";
 import { yupResolver } from "@hookform/resolvers/yup";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { SubmitHandler, useForm } from "react-hook-form";
+import * as yup from "yup";
 
 interface Inputs {
   email: string;
   password: string;
 }
 
-// Схема валидации с помощью Yup
 const schema = yup.object().shape({
   email: yup
     .string()
@@ -22,39 +25,41 @@ const schema = yup.object().shape({
     .required("Пароль обязателен"),
 });
 
-const SignIn = () => {
-  // Инициализация формы с использованием useForm
+const LogIn = () => {
+  const [error, setError] = useState("");
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<Inputs>({
-    resolver: yupResolver(schema), // Подключаем валидацию через Yup
+    resolver: yupResolver(schema),
   });
 
   // Обработчик отправки формы
-  const onSubmit: SubmitHandler<Inputs> = async (data) => {
-    // Здесь вы можете отправить данные на сервер для авторизации
+  const onSubmit: SubmitHandler<Inputs> = async (data): Promise<void> => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data), // Отправляем данные как JSON
-        }
-      );
+      const { email, password } = data;
+      const response = await AuthService.login(email, password);
 
-      if (!response.ok) {
+      if (response.status < 200 || response.status >= 300) {
+        setError("Ошибка регистрации");
         throw new Error("Ошибка регистрации");
       }
-
-      const result = await response.json();
-      console.log("Регистрация успешна:", result);
-
-      // Тут можно сделать редирект или уведомление о успешной регистрации
+      if (!response.data.user.isActived) {
+        setError(
+          "Пожалуйста зайдите на почту и перейдите по ссыке а затем попробуйте заново"
+        );
+        throw new Error(
+          "Пожалуйста зайдите на почту и перейдите по ссыке а затем попробуйте заново"
+        );
+      }
+      localStorage.setItem("token", response.data.accessToken);
+      dispatch(setAuth(true));
+      dispatch(setUser(response.data.user));
+      router.push("/user");
     } catch (error) {
       console.error("Ошибка регистрации:", error);
     }
@@ -117,9 +122,10 @@ const SignIn = () => {
         >
           Вход
         </button>
+        {error && <h4 className='text-red-600'>{error}</h4>}
       </form>
     </div>
   );
 };
 
-export default SignIn;
+export default LogIn;
